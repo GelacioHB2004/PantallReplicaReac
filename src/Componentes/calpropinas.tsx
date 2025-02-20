@@ -10,32 +10,32 @@ interface HistoryItem {
 }
 
 const calpropinas: React.FC = () => {
-  const [amount, setAmount] = useState<string>('');
-  const [customTip, setCustomTip] = useState<string>('');
+  const [cantidad, setAmount] = useState<string>('');
+  const [tipoporcentaje, setCustomTip] = useState<string>('');
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historial, setHistory] = useState<HistoryItem[]>([]);
 
-  const tipOptions: number[] = [10, 15, 20];
+  const Opcion: number[] = [10, 15, 20];
 
-  const calculateTip = (percentage: number | null) => {
-    const billAmount = parseFloat(amount);
-    if (isNaN(billAmount) || billAmount <= 0) return;
+  const calcularporcen = (percentage: number | null) => {
+    const Monto = parseFloat(cantidad);
+    if (isNaN(Monto) || Monto <= 0) return;
 
-    const tipPercent = percentage !== null ? percentage : parseFloat(customTip);
+    const tipPercent = percentage !== null ? percentage : parseFloat(tipoporcentaje);
     if (isNaN(tipPercent) || tipPercent <= 0) return;
 
-    const tipAmount = (billAmount * tipPercent) / 100;
-    const totalAmount = billAmount + tipAmount;
+    const tipAmount = (Monto * tipPercent) / 100;
+    const totalMonto = Monto + tipAmount;
 
     const newEntry: HistoryItem = {
       key: Math.random().toString(),
-      amount: billAmount.toFixed(2),
+      amount: Monto.toFixed(2),
       tipPercent,
       tipAmount: tipAmount.toFixed(2),
-      totalAmount: totalAmount.toFixed(2),
+      totalAmount: totalMonto.toFixed(2),
     };
 
-    setHistory([newEntry, ...history]);
+    setHistory([newEntry, ...historial]);
   };
 
   return (
@@ -46,14 +46,14 @@ const calpropinas: React.FC = () => {
         style={styles.input}
         keyboardType="numeric"
         placeholder="Monto de consumo"
-        value={amount}
+        value={cantidad}
         onChangeText={setAmount}
       />
 
       <Text style={styles.subtitle}>Selecciona un porcentaje de propina:</Text>
       <View style={styles.buttonContainer}>
-        {tipOptions.map((tip) => (
-          <TouchableOpacity key={tip} style={styles.tipButton} onPress={() => { setSelectedTip(tip); calculateTip(tip); }}>
+        {Opcion.map((tip) => (
+          <TouchableOpacity key={tip} style={styles.tipButton} onPress={() => { setSelectedTip(tip); calcularporcen(tip); }}>
             <Text style={styles.buttonText}>{tip}%</Text>
           </TouchableOpacity>
         ))}
@@ -63,17 +63,17 @@ const calpropinas: React.FC = () => {
         style={styles.input}
         keyboardType="numeric"
         placeholder="Propina personalizada %"
-        value={customTip}
+        value={tipoporcentaje}
         onChangeText={setCustomTip}
       />
 
-      <TouchableOpacity style={styles.calculateButton} onPress={() => calculateTip(null)}>
+      <TouchableOpacity style={styles.calculateButton} onPress={() => calcularporcen(null)}>
         <Text style={styles.calculateButtonText}>Calcular</Text>
       </TouchableOpacity>
 
       <Text style={styles.subtitle}>Historial de cálculos:</Text>
       <FlatList
-        data={history}
+        data={historial}
         renderItem={({ item }) => (
           <View style={styles.historyItem}>
             <Text style={styles.historyText}>
