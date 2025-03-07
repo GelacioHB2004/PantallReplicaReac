@@ -1,197 +1,136 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View, FlatList, Dimensions } from 'react-native';
-import axios from 'axios';
-import * as Location from 'expo-location'; 
+import React, { useEffect, useState } from "react";
+import { View, Text, ActivityIndicator, StyleSheet, FlatList } from "react-native";
 
-// Obtenemos el ancho de la pantalla para hacerlo responsivo
-const screenWidth = Dimensions.get('window').width;
+const Api_Key = "e4694013dafe60f9d90eb04957f93eeb";
+const lugar = "Huejutla de Reyes"; 
 
-type Pronostico = {
-    date: string;
-    day: {
-        maxtemp_c: number;
-        mintemp_c: number;
-        condition: {
-            text: string;
-            icon: string;
-        };
-        daily_chance_of_rain: number; // Probabilidad de lluvia
-    };
+const getBackgroundColor = (tempMax: number) => {
+  if (tempMax < 20) return "#ADD8E6"; 
+  if (tempMax >= 21 && tempMax <= 30) return "#FFD700";
+  return "#FF8C00"; 
 };
 
-// Función para obtener el color de fondo según la temperatura máxima
-const getBackgroundColor = (temp: number) => {
-    if (temp < 20) return '#2E86C1'; // Azul
-    if (temp >= 21 && temp <= 30) return '#F4C542'; // Amarillo
-    return '#F39C12'; // Naranja
-};
-
-// Función para obtener el día de la semana
-const getDayOfWeek = (date: string) => {
-    const day = new Date(date).toLocaleString('es-ES', { weekday: 'long' });
-    return day.charAt(0).toUpperCase() + day.slice(1); 
+const traducirDia = (fecha: string) => {
+  const dias = {
+    Sunday: "Domingo",
+    Monday: "Lunes",
+    Tuesday: "Martes",
+    Wednesday: "Miércoles",
+    Thursday: "Jueves",
+    Friday: "Viernes",
+    Saturday: "Sábado",
+  };
+  const diaIngles = new Date(fecha).toLocaleDateString("en-US", { weekday: "long" });
+  return dias[diaIngles as keyof typeof dias] || diaIngles;
 };
 
 const WeatherPronostico = () => {
-    const [pronosticoData, setPronosticoData] = useState<Pronostico[]>([]);
-    const [cargando, setCargando] = useState<boolean>(true);
+  const [weather, setWeather] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            
-            let { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                console.error("Permiso de ubicación denegado");
-                setCargando(false);
-                return;
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/forecast?q=${lugar}&appid=${Api_Key}&units=metric&lang=es`
+        );
+        const data = await response.json();
+        
+        console.log("Respuesta de la API:", data);
+
+        if (data.list) {
+          // Filtramos para obtener solo un reporte por día (cada 24h)
+          const dailyData: any[] = [];
+          const fechasAgregadas = new Set();
+
+          data.list.forEach((entry: any) => {
+            const fecha = entry.dt_txt.split(" ")[0]; // Extraemos solo la fecha (YYYY-MM-DD)
+
+            if (!fechasAgregadas.has(fecha)) {
+              fechasAgregadas.add(fecha);
+              dailyData.push({
+                date: fecha,
+                dayName: traducirDia(fecha),
+                tempMax: entry.main.temp_max,
+                tempMin: entry.main.temp_min,
+                rainProb: entry.pop * 100, // Probabilidad de lluvia
+                condition: entry.weather[0].description,
+              });
             }
+          });
 
-            let location = await Location.getCurrentPositionAsync({});
-            const latitude = location.coords.latitude;
-            const longitude = location.coords.longitude;
-            const apiKey = 'bc4d4340a9a24331b0022030252602';
-            const apiURL = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${latitude},${longitude}&days=5&aqi=no&alerts=no`;
+          setWeather(dailyData.slice(0, 5)); // Solo los próximos 5 días
+        } else {
+          console.error("No se obtuvieron datos de pronóstico.");
+        }
+      } catch (error) {
+        console.error("Error al obtener el clima:", error);
+      }
+      setLoading(false);
+    };
 
-            try {
-                const response = await axios.get(apiURL);
-                let data = response.data.forecast.forecastday;
+    fetchWeather();
+  }, []);
 
-                
-                if (data.length === 3) {
-                    const lastDate = new Date(data[2].date);
-                    for (let i = 3; i < 5; i++) {
-                        lastDate.setDate(lastDate.getDate() + 1);
-                        data.push({
-                            date: lastDate.toISOString().split('T')[0],
-                            day: {
-                                maxtemp_c: Math.floor(Math.random() * 10) + 20, 
-                                mintemp_c: Math.floor(Math.random() * 10) + 10,
-                                condition: {
-                                    text: 'Soleado',
-                                    icon: '//cdn.weatherapi.com/weather/64x64/day/113.png',
-                                },
-                                daily_chance_of_rain: Math.floor(Math.random() * 50),
-                            },
-                        });
-                    }
-                }
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
+  }
 
-                setPronosticoData(data);
-            } catch (error) {
-                console.log('Error al obtener datos del clima:', error);
-            } finally {
-                setCargando(false);
-            }
-        };
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Clima en {lugar}</Text>
 
-        fetchData();
-    }, []);
-
-    const CargandoScreen = () => (
-        <View style={styles.loadingContainer}>
-            <Text style={{ color: '#FFF' }}>Cargando Pronóstico...</Text>
-            <ActivityIndicator size="large" color="#FFF" />
-        </View>
-    );
-
-    const ForecastItem = ({ forecast }: { forecast: Pronostico }) => (
-        <View style={[styles.itemContainer, { backgroundColor: getBackgroundColor(forecast.day.maxtemp_c) }]}>
-            <Text style={styles.date}>{forecast.date}</Text>
-            <Text style={styles.day}>{getDayOfWeek(forecast.date)}</Text>
-            <Image
-                source={{ uri: `https:${forecast.day.condition.icon}` }}
-                style={styles.icon}
-            />
-            <Text style={styles.condition}>{forecast.day.condition.text}</Text>
-            <Text style={styles.temp}>
-                {forecast.day.maxtemp_c}° / {forecast.day.mintemp_c}°
-            </Text>
-            <Text style={styles.rainChance}>Probabilidad de lluvia: {forecast.day.daily_chance_of_rain}%</Text>
-        </View>
-    );
-
-    return (
-        <View style={styles.container}>
-            {cargando ? (
-                <CargandoScreen />
-            ) : (
-                <FlatList
-                    data={pronosticoData}
-                    renderItem={({ item }) => <ForecastItem forecast={item} />}
-                    keyExtractor={(item) => item.date}
-                    horizontal={false}  
-                    showsVerticalScrollIndicator={false} 
-                    contentContainerStyle={styles.scrollContainer}
-                />
-            )}
-        </View>
-    );
+      {weather.length === 0 ? (
+        <Text style={styles.error}>No hay datos disponibles</Text>
+      ) : (
+        <FlatList
+          data={weather}
+          keyExtractor={(item) => item.date}
+          renderItem={({ item }) => (
+            <View style={[styles.card, { backgroundColor: getBackgroundColor(item.tempMax) }]}>
+              <Text style={styles.day}>{item.dayName}</Text>
+              <Text>{item.date}</Text>
+              <Text>🌡️ Máx: {item.tempMax}°C | Mín: {item.tempMin}°C</Text>
+              <Text>🌧️ Prob. lluvia: {item.rainProb.toFixed(1)}%</Text>
+              <Text>🌤️ {item.condition}</Text>
+            </View>
+          )}
+          horizontal={true}
+          showsHorizontalScrollIndicator={false}
+        />
+      )}
+    </View>
+  );
 };
 
-export default WeatherPronostico;
-
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#2C2C2C', 
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    scrollContainer: {
-        paddingVertical: 20,
-    },
-    itemContainer: {
-        borderRadius: 10,
-        padding: 15,
-        marginVertical: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: screenWidth * 0.85, 
-        minHeight: 150, 
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    date: {
-        fontSize: 14,
-        color: '#FFF',
-        marginBottom: 4,
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
-    day: {
-        fontSize: 14,
-        color: '#FFF',
-        marginBottom: 4,
-        textAlign: 'center',
-    },
-    icon: {
-        width: 50,
-        height: 50,
-        marginVertical: 10,
-    },
-    condition: {
-        fontSize: 12,
-        color: '#FFF',
-        textAlign: 'center',
-        marginVertical: 2,
-    },
-    temp: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#FFF',
-    },
-    rainChance: {
-        fontSize: 12,
-        color: '#FFF',
-        textAlign: 'center',
-        marginTop: 5,
-    },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+  },
+  error: {
+    fontSize: 18,
+    color: "red",
+    fontWeight: "bold",
+  },
+  card: {
+    padding: 15,
+    margin: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    width: 200,
+  },
+  day: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
 });
+
+export default WeatherPronostico;
